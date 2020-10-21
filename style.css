@@ -1,0 +1,91 @@
+
+* {
+    margin: 0;
+    transition: 350ms;
+}
+
+@font-face {
+    font-family: 'PixelOperator8';
+    src: url('PixelOperator8.ttf');
+}
+
+@font-face {
+    font-family: 'PixelOperator8-Bold';
+    src: url('PixelOperator8-Bold.ttf');
+}
+
+body {
+    background: #70c5ce;
+}
+
+img {
+    font-size: 80px;
+    padding-top: 15vh;
+    margin: auto;
+    display: block;
+    transform: scale(1.2);
+}
+
+h2 {
+    font-size: 40px;
+    margin-top: 16vh;
+    font-family: PixelOperator8-Bold, cursive;
+    text-align: center;
+    font-weight: normal;
+}
+
+#nameLabel {
+    position: absolute;
+    transform: translateY(25px);
+    font-size: 15px;
+    font-family: PixelOperator8, cursive;
+    text-shadow: rgba(59, 59, 59, 0.33) 0 0 5px;
+}
+
+#input {
+    display: flex block;
+    width: 350px;
+    height: 30px;
+    margin: 15vh auto auto;
+
+}
+
+input {
+    width: 65%;
+    height: 100%;
+    outline: none;
+    border: none;
+    border-bottom: black solid 5px;
+    padding: 0 0 0 5px;
+    font-size: 14px;
+    font-family: PixelOperator8, cursive;
+    box-shadow: rgb(255, 255, 255) 0 0 3px;
+}
+
+#input button {
+    width: 30%;
+    height: 100%;
+    border: black solid 2px;
+    padding: 0;
+    outline: none;
+    font-size: 15px;
+    font-family: PixelOperator8, cursive;
+}
+
+#input button:hover {
+    color: white;
+    background: black;
+    border: grey solid 2px;
+}
+
+#warn {
+    margin: 12vh auto auto;
+    width: 400px;
+    padding: 2px;
+    color: black;
+    font-family: PixelOperator8, cursive;
+    border-radius: 5px;
+    background: #fff4bf;
+    text-align: center;
+
+}

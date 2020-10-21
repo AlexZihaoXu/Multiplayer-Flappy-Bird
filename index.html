@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test</title>
+    <script src="flappyBirdWithBomb.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="content">
+    <img src="logo.png" alt="FlappyBird Logo">
+    <h2>with <span style="font-weight: bold; color: #2f9602">Grenade</span></h2>
+
+    <div id="input">
+        <p id="nameLabel">
+            Name
+        </p> <br>
+        <label>
+            <input type="text" autocomplete="off" required="required" spellcheck="false" id="name" oninput="checkValid()"
+                   onfocusin="riseName()" onfocusout="restoreName()"
+            >
+        </label>
+        <button onclick="startGame()"> Enter</button>
+    </div>
+
+    <p id="warn" hidden>
+    </p>
+
+
+</div>
+
+
+
+</body>
+</html>
