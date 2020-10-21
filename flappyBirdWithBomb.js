@@ -1,4 +1,4 @@
-const SERVER_ADDRESS = 'ws://192.168.137.1:8080/';
+const SERVER_ADDRESS = 'ws://alex-xu.site:8080/';
 
 function warn(message) {
     let element = document.getElementById('warn');
