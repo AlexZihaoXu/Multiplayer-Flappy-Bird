@@ -1,4 +1,4 @@
-const SERVER_ADDRESS = 'ws://alex-xu.site:8080/';
+const SERVER_ADDRESS = 'ws://localhost:8080/';
 
 function warn(message) {
     let element = document.getElementById('warn');
@@ -55,7 +55,7 @@ function startGame() {
     const client = new WebSocket(SERVER_ADDRESS);
     let valid = null;
     client.onopen = function () {
-        client.send("VALID/" + name + "/TMP");
+        client.send("LOGIN/" + name + "/TMP");
     }
     setTimeout(function () {
         if (valid === null)
@@ -122,7 +122,7 @@ let _last_loop = 0;
 let _update_per_loop = 1;
 let _display_fps = 0;
 let fps = 0;
-
+let playerColor = 0;
 //
 
 function Rect(x, y, w, h) {
@@ -140,6 +140,15 @@ function Rect(x, y, w, h) {
     }
 }
 
+function rand(a, b) {
+    return Math.floor(a + Math.random()*(b - a));
+}
+
+function switchColor() {
+    playerColor = (playerColor + 1) % 3;
+    document.getElementById("color").style.background = ['gold', '#add9f8', '#ff4800'][playerColor];
+}
+
 function imgRect(path, x, y) {
     let w = RES_INFO['textures/' + path]['w'];
     let h = RES_INFO['textures/' + path]['h'];
@@ -149,6 +158,14 @@ function imgRect(path, x, y) {
         w * GLOBAL_SCALE * camera.z,
         h * GLOBAL_SCALE * camera.z
     )
+}
+
+function trueX(x, extraZ=1) {
+    return (x - camera.x) * GLOBAL_SCALE * camera.z * extraZ + WIN_WIDTH / 2 * GLOBAL_SCALE;
+}
+
+function trueY(y, extraZ=1) {
+    return (y - camera.y) * GLOBAL_SCALE * camera.z * extraZ + WIN_HEIGHT / 2 * GLOBAL_SCALE;
 }
 
 function delay(ms) {
@@ -196,6 +213,7 @@ function main(name) {
         space: false,
         leftShift: false
     }
+    let particles = [];
 
     const gameObj = {
         renderBg: function (x = 0, y = 0) {
@@ -205,6 +223,40 @@ function main(name) {
         renderGround: function (x = 0, y = 0) {
             render('ground.png', x, y);
         },
+        particle: function (x, y, deltaX=0, deltaY=0, color='#ffffff', size=4, lifetime=1000) {
+            return {
+                x: x,
+                y: y,
+                deltaX: deltaX + (rand(0, 10) - 5) / 5,
+                deltaY: deltaY + (rand(0, 10) - 5) / 5,
+                color: color,
+                birthday: now(),
+                size: 4,
+                lifetime: lifetime,
+                render: function () {
+                    const size = this.size * camera.z * GLOBAL_SCALE;
+                    view.fillStyle = color;
+                    view.fillRect(trueX(this.x), trueY(this.y), size, size);
+                    this.size *= 0.99;
+                },
+                update: function () {
+                    this.y += this.deltaY;
+                    this.x += this.deltaX;
+
+                    this.deltaX *= 0.98;
+                    this.deltaY += 0.1;
+                    if (this.y > 320) {
+                        this.deltaY = -this.deltaY / 2;
+                        this.y = 320;
+                    }
+                }
+            }
+        },
+        border: {
+            left: -2000,
+            right: 2000,
+            top: -2000
+        },
         bird: function (name="Bird", x=0, y=0, color=0, health=1, direction=true) {
             return {
                 name: name,
@@ -213,14 +265,39 @@ function main(name) {
                 direction: direction,
                 color: color,
                 hp: health,
+                animateSpeed: 150,
+                lag: 1,
                 target: {
                     x: x,
                     y: y,
                 },
                 __enabled_time: now(),
-                update: function (lag=1) {
-                    this.x += (this.target.x - this.x) / lag;
-                    this.y += (this.target.y - this.y) / lag;
+                update: function () {
+                    if (this.target.x > gameObj.border.right) {
+                        this.target.x = gameObj.border.right - 1;
+                    }
+                    if (this.target.x < gameObj.border.left) {
+                        this.target.x = gameObj.border.left + 1;
+                    }
+                    if (this.target.y < gameObj.border.top) {
+                        this.target.y = gameObj.border.top + 1;
+                    }
+
+                    let deltaX = (this.target.x - this.x);
+                    let deltaY = (this.target.y - this.y);
+                    let ground = this === player ? 300: 290;
+                    if (this !== player) {
+                        deltaX *= 0.5;
+                    }
+                    if (this.y > ground && deltaY < -1) {
+                        for (let i = 0; i < (this === player ?5:2); i++) {
+                            particles.push(gameObj.particle(this.x, this.y + 20, deltaX, deltaY, ['gold', "#1ca3cb", "#cf320a"][this.color], 1, 5000));
+                        }
+                    }
+                    if (this.y > ground && Math.abs(deltaX) > 1 && rand(0, 2) === 0)
+                        particles.push(gameObj.particle(this.x, this.y+20, -deltaX, deltaY-1.4, rand(0, 3) === 0?['gold', "#1ca3cb", "#cf320a"][this.color]:"#944120", 2, 3000));
+                    this.x += (this.target.x - this.x) / this.lag;
+                    this.y += (this.target.y - this.y) / this.lag;
                 },
                 render: function () {
                     const frames = this.direction ? [
@@ -235,7 +312,7 @@ function main(name) {
                         "birds/left/"+this.color.toString()+"/1.png"
                     ];
                     render(
-                        frames[Math.floor((now() - this.__enabled_time) / 150) % 4],
+                        frames[Math.floor((now() - this.__enabled_time) / this.animateSpeed) % 4],
                         this.x, this.y
                     );
                     gameObj.renderText(this.name, this.x, this.y - 35, 20);
@@ -257,17 +334,16 @@ function main(name) {
         },
         localController: function() {
             return {
-                bird: gameObj.bird(name),
+                bird: gameObj.bird(name, 0, 0, playerColor),
                 deltaY: 0,
                 deltaX: 0,
                 update: function () {
+                    camera.target.x = this.bird.target.x;
+                    camera.target.y = this.bird.target.y;
+                    if (this.bird.target.y > 300) {
 
-
-                    camera.target.x = this.bird.x;
-                    camera.target.y = this.bird.y;
-                    if (this.bird.y > 300) {
-                        this.deltaY = this.deltaY > 1.4 ? -this.deltaY / 2.4:0;
-                        this.bird.y = 300;
+                        this.bird.target.y = 300;
+                        this.deltaY = this.deltaY > 0.3 ? -this.deltaY / 1.5:0;
                     }
                     if (pressing.left) {
                         this.deltaX = Math.max(this.deltaX - 0.1, -5.2);
@@ -278,18 +354,21 @@ function main(name) {
                         this.bird.direction = true;
                     }
                     if (pressing.up) {
-                        this.deltaY = Math.min(this.deltaY - 0.08, 3);
+                        this.deltaY = Math.min(this.deltaY - 0.11, 5);
                     }
                     if (pressing.down){
                         this.deltaY = Math.max(this.deltaY + 0.08, -3);
                     }
+                    this.bird.animateSpeed += ((300 - Math.abs(Math.abs(this.deltaX) - 2.5) * 25) - this.bird.animateSpeed) / 60;
+                    this.deltaY = Math.max(this.deltaY + 0.013 * (5.1-Math.abs(this.deltaX)), -3);
 
-                    this.deltaY = Math.max(this.deltaY + 0.01, -3)
+                    camera.target.z = 0.94 + (5.5 - Math.abs(this.deltaX)) * 0.03;
 
-                    this.bird.y += this.deltaY;
-                    this.bird.x += this.deltaX;
-                    if (this.bird.y > 295)
+                    this.bird.target.y += this.deltaY;
+                    this.bird.target.x += this.deltaX;
+                    if (this.bird.target.y > 298) {
                         this.deltaX *= 0.95;
+                                            }
                     else {
                         if (this.deltaX > 0) {
                             this.deltaX -= 0.01;
@@ -302,26 +381,51 @@ function main(name) {
         }
     };
 
+    let stars = [];
+    for (let i = 0; i < 100; i++) {
+        stars.push({
+            x: rand(gameObj.border.left, gameObj.border.right),
+            y: rand(gameObj.border.top, gameObj.border.top - gameObj.border.top * 0.8),
+            z: rand(80, 90) * 0.01,
+        });
+    }
+    for (let i = 0; i < 100; i++) {
+        stars.push({
+            x: rand(gameObj.border.left, gameObj.border.right),
+            y: rand(gameObj.border.top, gameObj.border.top - gameObj.border.top * 0.5),
+            z: rand(80, 90) * 0.01,
+        });
+    }
+    for (let i = 0; i < 100; i++) {
+        stars.push({
+            x: rand(gameObj.border.left, gameObj.border.right),
+            y: rand(gameObj.border.top, gameObj.border.top - gameObj.border.top * 0.3),
+            z: rand(80, 90) * 0.01,
+        });
+    }
+
     const controller = gameObj.localController();
     const player = controller.bird;
-    let birds = [];
-    let birdsIndex = [];
+    let birds = [player];
+    let birdsIndex = [player.name];
     const server = {
         client: new WebSocket(SERVER_ADDRESS),
         name: name,
         connect: async function () {
             const client = this.client;
             const name = this.name;
-            this.client.onopen = async function (evt) {
-                client.send("VALID/"+name);
+            this.client.onopen = async function () {
+                client.send("LOGIN/"+name+"/"+player.color);
                 let lastX = 0;
                 let lastY = 0;
+                let lastAnimateSpeed = 1;
                 while (client.OPEN) {
-                    await delay(1000/30);
-                    if (lastX !== Math.round(player.x) || lastY !== Math.round(player.y)) {
+                    await delay(1000/25);
+                    if (lastX !== Math.round(player.x) || lastY !== Math.round(player.y) || lastAnimateSpeed !== Math.round(player.animateSpeed)) {
                         lastX = Math.round(player.x);
-                        lastY = Math.round(player.y)
-                        client.send("MOV/" + lastX + "/" + lastY + "/" + (player.direction?1:0).toString());
+                        lastY = Math.round(player.y);
+                        lastAnimateSpeed = Math.round(player.animateSpeed);
+                        client.send("MOV/" + lastX + "/" + lastY + "/" + (player.direction?1:0).toString() + "/" + lastAnimateSpeed);
                     }
                 }
                 console.log("Stopped");
@@ -331,21 +435,26 @@ function main(name) {
                 const prefix = rawText.split('/')[0];
                 const info = rawText.split('/').slice(1);
                 if (prefix === 'LOG') {
-                    console.log(info);
+                    console.log(info.join('/'));
                 } else if (prefix === 'REG') {
-                    birds.push(gameObj.bird(info[0]));
+                    let newBird = gameObj.bird(info[0], 0, 0, parseInt(info[1]));
+                    newBird.lag = 5.5;
+                    birds.push(newBird);
                     birdsIndex.push(info[0]);
                 } else if (prefix === 'MOV') {
                     const updating = birds[birdsIndex.indexOf(info[0])];
                     updating.target.x = parseInt(info[1]);
                     updating.target.y = parseInt(info[2]);
+                    updating.animateSpeed = parseInt(info[4]);
                     updating.direction = info[3] === '1';
                 } else if (prefix === 'LEV') {
                     const index = birdsIndex.indexOf(info[0]);
                     birds.splice(index, 1);
                     birdsIndex.splice(index, 1);
-                }
-                else{
+                } else if (prefix === 'BDR') {
+                    gameObj.border.left = parseInt(info[0]);
+                    gameObj.border.right = parseInt(info[1]);
+                    gameObj.border.top = parseInt(info[2]);
                 }
             }
             client.onclose = function () {
@@ -409,7 +518,9 @@ function main(name) {
         for (const bird of birds) {
             bird.render();
         }
-        player.render();
+        for (const particle of particles) {
+            particle.render();
+        }
     }
 
     function draw() {
@@ -418,15 +529,21 @@ function main(name) {
 
         // Rendering Background
         // - Pure Color Background
-        view.fillStyle = '#ded895';
-        view.fillRect(
-            0,
-            rect.bottom - 1,
-            cvs.width,
-            cvs.height - rect.bottom
-        );
-
-        view.fillStyle = '#70c5ce';
+        if (rect.bottom - 1 < cvs.height) {
+            view.fillStyle = '#ded895';
+            view.fillRect(
+                0,
+                rect.bottom - 1,
+                cvs.width,
+                cvs.height - rect.bottom
+            );
+        }
+        function toHex(n) {
+            let result = Math.floor(n).toString(16);
+            return result.length === 1 ? '0' + result : result;
+        }
+        let brightness = Math.max(0, 1 + Math.max(0,rect.bottom - rect.h * 4 - player.y) / gameObj.border.top / 1.05);
+        view.fillStyle = '#' + toHex(112 * brightness) + toHex(197 * brightness) + toHex(Math.max(50, 206 * brightness));
         view.fillRect(
             0,
             0,
@@ -443,7 +560,28 @@ function main(name) {
             gameObj.renderGround(unitSize * i + camera.x - (camera.x % unitSize), 322 + 14);
             gameObj.renderGround(-unitSize * i + camera.x - (camera.x % unitSize), 322 + 14);
         }
+
+        view.fillStyle = 'white';
+        for (const star of stars) {
+            view.fillRect(
+                trueX(star.x, star.z),
+                trueY(star.y),
+                2,
+                2
+            )
+        }
+
         renderObjects();
+        // Border
+        view.fillStyle = "#ff0000"+Math.max(10, (11+Math.floor(70 * (1 - (gameObj.border.right - player.x)/1000))));
+        view.fillRect(trueX(gameObj.border.right), 0, cvs.width-trueX(gameObj.border.right), cvs.height);
+
+        view.fillStyle = "#ff0000"+Math.max(10, (11+Math.floor(70 * (1 - (player.x - gameObj.border.left)/1000))));
+        view.fillRect(0, 0, trueX(gameObj.border.left), cvs.height);
+
+        view.fillStyle = "#ff0000"+Math.max(10, (11+Math.floor(70 * (1 - (player.y - gameObj.border.top)/1000))));
+        view.fillRect(0, 0, cvs.width, trueY(gameObj.border.top));
+
         //
         view.font = Math.round(24*GLOBAL_SCALE)+"px PixelOperator8";
         view.fillStyle = 'grey';
@@ -460,8 +598,18 @@ function main(name) {
         WIN_HEIGHT = cvs.height / GLOBAL_SCALE;
         _display_fps += (fps - _display_fps) / 10;
         controller.update();
-        for (const bird of birds) {
-            bird.update(5);
+        for (const bird of birds){
+            bird.update();
+        }
+        let deletable = [];
+        for (const particle of particles) {
+            particle.update();
+            if (now() - particle.birthday > particle.lifetime) {
+                deletable.push(particle);
+            }
+        }
+        while (deletable.length > 0) {
+            particles.splice(particles.indexOf(deletable.pop()), 1);
         }
         camera.update();
     }
