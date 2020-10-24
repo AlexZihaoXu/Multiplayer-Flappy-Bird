@@ -461,7 +461,8 @@ function main(name) {
                 alert("You lost connection. ");
             }
         }
-    }
+    };
+    const touchPos = {x:0, y:0, nx:0, ny: 0};
     server.connect();
 
     window.addEventListener('keydown', function (evt) {
@@ -513,6 +514,30 @@ function main(name) {
                 break;
         }
     }, true)
+
+    window.addEventListener('touchstart', function (evt) {
+        touchPos.nx = touchPos.x = evt.touches[0].clientX;
+        touchPos.ny = touchPos.y = evt.touches[0].clientY;
+    })
+    window.addEventListener('touchmove', function (evt) {
+        touchPos.nx = evt.touches[0].clientX;
+        touchPos.ny = evt.touches[0].clientY;
+        if (Math.abs(touchPos.x - touchPos.nx) > 50) {
+            pressing.right = touchPos.nx > touchPos.x;
+            pressing.left = !pressing.right;
+        } else {
+            pressing.left = pressing.right = false;
+        }
+        if (Math.abs(touchPos.y - touchPos.ny) > 50) {
+            console.log('doing');
+            pressing.down = touchPos.ny > touchPos.y;
+            pressing.up = !pressing.down;
+        }
+    })
+    window.addEventListener('touchend', function () {
+        touchPos.nx = touchPos.x = touchPos.ny = touchPos.y = 0;
+        pressing.up = pressing.down = pressing.left = pressing.right = false;
+    })
 
     function renderObjects() {
         for (const bird of birds) {
@@ -588,6 +613,27 @@ function main(name) {
         view.fillText("FPS: " + Math.round(_display_fps * 10) / 10, 6 * GLOBAL_SCALE, 36 * GLOBAL_SCALE);
         view.fillStyle = 'white';
         view.fillText("FPS: " + Math.round(_display_fps * 10) / 10, 5 * GLOBAL_SCALE, 35 * GLOBAL_SCALE);
+
+        // touch screen
+        if (touchPos.x !== 0 && touchPos.y !== 0) {
+            view.beginPath();
+            view.arc(touchPos.x, touchPos.y, 35, 0, 2 * Math.PI);
+            view.stroke();
+            view.fillStyle = "rgba(0,0,0,0.27)";
+            view.fill();
+
+            view.beginPath();
+            view.arc(touchPos.nx, touchPos.ny, 28, 0, 2 * Math.PI);
+            view.stroke();
+            view.fillStyle = "rgba(255,255,255,0.27)";
+            view.fill();
+
+            view.beginPath();
+            view.moveTo(touchPos.nx, touchPos.ny);
+            view.lineTo(touchPos.x, touchPos.y);
+            view.stroke();
+        }
+
     }
 
     function update() {
